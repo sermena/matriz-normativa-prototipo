@@ -258,69 +258,100 @@
     border-top: 1px solid var(--border);
   }
 
-  /* ── Heatmap View ── */
-  .heatmap-container {
-    padding: 24px 32px;
+  /* ── Chord View ── */
+  .chord-container {
     height: calc(100vh - 110px);
-    overflow: auto;
     display: none;
+    overflow: hidden;
   }
-  .heatmap-container h2 {
-    font-size: 18px;
-    font-weight: 700;
-    margin-bottom: 6px;
+  .chord-layout {
+    display: flex;
+    height: 100%;
   }
-  .heatmap-container .subtitle {
+  .chord-svg-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    min-width: 0;
+  }
+  .chord-svg-wrap svg {
+    width: 100%;
+    height: 100%;
+    max-width: 700px;
+    max-height: 700px;
+  }
+  .chord-info {
+    width: 320px;
+    min-width: 320px;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    padding: 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .chord-info-empty {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
     font-size: 13px;
-    color: var(--text-dim);
-    margin-bottom: 24px;
+    text-align: center;
   }
-
-  .heatmap-grid {
-    display: inline-grid;
-    gap: 3px;
+  .chord-info h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 4px;
   }
-  .heatmap-cell {
-    width: 36px;
-    height: 36px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.15s;
-    position: relative;
-  }
-  .heatmap-cell:hover {
-    transform: scale(1.3);
-    z-index: 10;
-    box-shadow: 0 0 12px rgba(108,92,231,0.5);
-  }
-  .heatmap-cell.empty { background: var(--surface); }
-  .heatmap-cell.filled { background: var(--accent); }
-  .heatmap-cell.filled.high { background: #6c5ce7; }
-  .heatmap-cell.filled.med { background: #4a3fb5; }
-  .heatmap-cell.filled.low { background: #2d2a6e; }
-
-  .heatmap-label-col {
+  .chord-info .ci-type {
+    font-family: 'DM Mono', monospace;
     font-size: 10px;
-    color: var(--text-dim);
-    writing-mode: vertical-rl;
-    text-orientation: mixed;
-    transform: rotate(180deg);
-    max-height: 120px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    padding: 4px 0;
-    text-align: left;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
   }
-  .heatmap-label-row {
-    font-size: 11px;
+  .chord-info .ci-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .chord-info .ci-stat .ci-val {
+    font-family: 'DM Mono', monospace;
+    font-weight: 600;
+    color: var(--accent-light);
+  }
+  .chord-info .ci-connections {
+    margin-top: 16px;
+  }
+  .chord-info .ci-connections h4 {
+    font-size: 12px;
+    font-weight: 600;
     color: var(--text-dim);
-    max-width: 180px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding-right: 8px;
-    text-align: right;
-    line-height: 36px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+  .chord-info .ci-conn-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 4px;
+    transition: background 0.15s;
+  }
+  .chord-info .ci-conn-item:hover { background: var(--surface2); }
+  .chord-info .ci-conn-bar {
+    height: 4px;
+    border-radius: 2px;
+    margin-top: 4px;
   }
 
   .tooltip {
@@ -482,6 +513,7 @@
   }
   .animate-in { animation: fadeIn 0.25s ease forwards; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 </head>
 <body>
 
@@ -492,7 +524,7 @@
 
 <div class="nav">
   <button class="active" onclick="switchView('explore')">Explorar Relaciones</button>
-  <button onclick="switchView('heatmap')">Mapa de Calor</button>
+  <button onclick="switchView('chord')">Diagrama de Acordes</button>
   <button onclick="switchView('stats')">Estadísticas</button>
 </div>
 
@@ -518,11 +550,19 @@
   </div>
 </div>
 
-<!-- ═══ HEATMAP VIEW ═══ -->
-<div class="heatmap-container" id="view-heatmap">
-  <h2>Mapa de Calor — Cruces entre Categorías</h2>
-  <p class="subtitle">Cada celda muestra la cantidad de relaciones entre una categoría de reglamento y una categoría de tema</p>
-  <div id="heatmapArea"></div>
+<!-- ═══ CHORD VIEW ═══ -->
+<div class="chord-container" id="view-chord">
+  <div class="chord-layout">
+    <div class="chord-svg-wrap">
+      <svg id="chordSvg"></svg>
+    </div>
+    <div class="chord-info" id="chordInfo">
+      <div class="chord-info-empty">
+        <div class="icon" style="font-size:36px; opacity:0.3; margin-bottom:12px;">◎</div>
+        <div>Pasá el cursor sobre un segmento<br>o cuerda para ver el detalle</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ STATS VIEW ═══ -->
@@ -637,13 +677,13 @@ let navHistory = []; // { id, mode, name }
 function switchView(view) {
   currentView = view;
   document.querySelectorAll('.nav')[0].querySelectorAll('button').forEach((b, i) => {
-    b.classList.toggle('active', ['explore','heatmap','stats'][i] === view);
+    b.classList.toggle('active', ['explore','chord','stats'][i] === view);
   });
   document.getElementById('view-explore').style.display = view === 'explore' ? 'flex' : 'none';
-  document.getElementById('view-heatmap').style.display = view === 'heatmap' ? 'block' : 'none';
+  document.getElementById('view-chord').style.display = view === 'chord' ? 'block' : 'none';
   document.getElementById('view-stats').style.display = view === 'stats' ? 'block' : 'none';
 
-  if (view === 'heatmap') renderHeatmap();
+  if (view === 'chord') renderChord();
   if (view === 'stats') renderStats();
 }
 
@@ -813,80 +853,211 @@ function clearNav() {
   renderDetail();
 }
 // ═══════════════════════════════════════════════
+//  CHORD DIAGRAM
+// ═══════════════════════════════════════════════
 
-function renderHeatmap() {
-  const area = document.getElementById('heatmapArea');
+function renderChord() {
+  const svg = d3.select('#chordSvg');
+  svg.selectAll('*').remove();
 
-  // Build category-to-category matrix
-  const matrix = {};
-  regCategories.forEach(rc => {
-    matrix[rc] = {};
-    temaCategories.forEach(tc => { matrix[rc][tc] = 0; });
-  });
+  const container = document.querySelector('.chord-svg-wrap');
+  const size = Math.min(container.clientWidth, container.clientHeight, 700);
+  const outerRadius = size / 2 - 40;
+  const innerRadius = outerRadius - 24;
+
+  svg.attr('viewBox', `${-size/2} ${-size/2} ${size} ${size}`);
+
+  // All categories: regs first, then temas
+  const allCats = [...regCategories, ...temaCategories];
+  const n = allCats.length;
+
+  // Color palette
+  const regColors = ['#6c5ce7','#a29bfe','#7c6ef0','#5a4bd1','#8b7cf6','#4834d4','#6e5ff0','#9b8ffa'];
+  const temaColors = ['#00cec9','#55efc4','#81ecec','#00b894','#2ed8d3','#00d2d3','#38d9a9'];
+  const colors = [...regColors.slice(0, regCategories.length), ...temaColors.slice(0, temaCategories.length)];
+
+  // Build NxN matrix
+  const matrix = Array.from({length: n}, () => Array(n).fill(0));
 
   cruces.forEach(c => {
-    const reg = reglamentos[c.regId] || reglamentos.find(r => r.id === c.regId);
-    const tema = temas[c.temaId];
-    if (reg && tema && matrix[reg.category]) {
-      matrix[reg.category][tema.category] = (matrix[reg.category][tema.category] || 0) + 1;
-    }
+    const reg = reglamentos.find(r => r.id === c.regId);
+    const tema = temas.find(t => t.id === c.temaId);
+    if (!reg || !tema) return;
+    const ri = regCategories.indexOf(reg.category);
+    const ti = temaCategories.indexOf(tema.category);
+    if (ri === -1 || ti === -1) return;
+    const row = ri;
+    const col = regCategories.length + ti;
+    matrix[row][col] += 1;
+    matrix[col][row] += 1;
   });
 
-  const maxVal = Math.max(...Object.values(matrix).flatMap(r => Object.values(r)));
+  // D3 chord layout
+  const chord = d3.chord()
+    .padAngle(0.04)
+    .sortSubgroups(d3.descending)(matrix);
 
-  const cols = temaCategories.length + 1;
-  let html = `<div class="heatmap-grid" style="grid-template-columns: 180px repeat(${temaCategories.length}, 36px);">`;
+  const arc = d3.arc().innerRadius(innerRadius).outerRadius(outerRadius);
+  const ribbon = d3.ribbon().radius(innerRadius - 2);
 
-  // Column headers
-  html += `<div></div>`;
-  temaCategories.forEach(tc => {
-    html += `<div class="heatmap-label-col" title="${tc}">${tc}</div>`;
-  });
+  // Draw arcs (outer segments)
+  const arcs = svg.append('g')
+    .selectAll('g')
+    .data(chord.groups)
+    .join('g');
 
-  // Rows
-  regCategories.forEach(rc => {
-    html += `<div class="heatmap-label-row" title="${rc}">${rc}</div>`;
-    temaCategories.forEach(tc => {
-      const val = matrix[rc][tc];
-      let cls = 'empty';
-      if (val > 0) {
-        const pct = val / maxVal;
-        cls = pct > 0.6 ? 'filled high' : pct > 0.3 ? 'filled med' : 'filled low';
-      }
-      html += `<div class="heatmap-cell ${cls}" 
-                    data-reg-cat="${rc}" data-tema-cat="${tc}" data-val="${val}"
-                    onmouseenter="showTooltipHM(event, this)" 
-                    onmouseleave="hideTooltip()"></div>`;
+  arcs.append('path')
+    .attr('d', arc)
+    .attr('fill', d => colors[d.index])
+    .attr('stroke', 'rgba(0,0,0,0.3)')
+    .attr('stroke-width', 1)
+    .style('cursor', 'pointer')
+    .on('mouseenter', function(event, d) {
+      highlightGroup(d.index, chord);
+      showChordInfo('group', d.index, chord);
+    })
+    .on('mouseleave', function() {
+      resetHighlight();
+      resetChordInfo();
     });
-  });
 
-  html += `</div>`;
+  // Arc labels
+  arcs.append('text')
+    .each(d => { d.angle = (d.startAngle + d.endAngle) / 2; })
+    .attr('dy', '0.35em')
+    .attr('transform', d => `
+      rotate(${(d.angle * 180 / Math.PI - 90)})
+      translate(${outerRadius + 10})
+      ${d.angle > Math.PI ? 'rotate(180)' : ''}
+    `)
+    .attr('text-anchor', d => d.angle > Math.PI ? 'end' : 'start')
+    .attr('fill', d => colors[d.index])
+    .attr('font-size', '11px')
+    .attr('font-family', 'DM Sans, sans-serif')
+    .attr('font-weight', '600')
+    .text(d => {
+      const name = allCats[d.index];
+      return name.length > 20 ? name.slice(0, 18) + '…' : name;
+    });
 
-  // Legend
-  html += `<div style="display:flex; gap:16px; align-items:center; margin-top:20px; font-size:12px; color:var(--text-dim);">
-    <span>Menos relaciones</span>
-    <div style="width:20px;height:14px;background:#2d2a6e;border-radius:3px;"></div>
-    <div style="width:20px;height:14px;background:#4a3fb5;border-radius:3px;"></div>
-    <div style="width:20px;height:14px;background:#6c5ce7;border-radius:3px;"></div>
-    <span>Más relaciones</span>
-  </div>`;
+  // Draw ribbons (chords)
+  svg.append('g')
+    .attr('class', 'ribbons')
+    .selectAll('path')
+    .data(chord)
+    .join('path')
+    .attr('d', ribbon)
+    .attr('fill', d => colors[d.source.index])
+    .attr('fill-opacity', 0.45)
+    .attr('stroke', 'rgba(255,255,255,0.05)')
+    .attr('stroke-width', 0.5)
+    .style('cursor', 'pointer')
+    .on('mouseenter', function(event, d) {
+      highlightRibbon(d, chord);
+      showChordInfo('ribbon', d);
+    })
+    .on('mouseleave', function() {
+      resetHighlight();
+      resetChordInfo();
+    });
 
-  area.innerHTML = html;
-}
+  // Highlight helpers
+  function highlightGroup(index, chord) {
+    svg.selectAll('.ribbons path')
+      .attr('fill-opacity', d =>
+        (d.source.index === index || d.target.index === index) ? 0.7 : 0.06
+      );
+    arcs.selectAll('path')
+      .attr('opacity', d => {
+        if (d.index === index) return 1;
+        const connected = chord.some(c =>
+          (c.source.index === index && c.target.index === d.index) ||
+          (c.target.index === index && c.source.index === d.index)
+        );
+        return connected ? 0.8 : 0.2;
+      });
+  }
 
-function showTooltipHM(e, el) {
-  const tip = document.getElementById('tooltip');
-  tip.innerHTML = `
-    <div class="t-reg">${el.dataset.regCat}</div>
-    <div class="t-tema">↔ ${el.dataset.temaCat}</div>
-    <div class="t-art">${el.dataset.val} relaciones</div>`;
-  tip.style.display = 'block';
-  tip.style.left = e.clientX + 12 + 'px';
-  tip.style.top = e.clientY - 10 + 'px';
-}
+  function highlightRibbon(active) {
+    svg.selectAll('.ribbons path')
+      .attr('fill-opacity', d =>
+        (d.source.index === active.source.index && d.target.index === active.target.index) ? 0.85 : 0.06
+      );
+    arcs.selectAll('path')
+      .attr('opacity', d =>
+        (d.index === active.source.index || d.index === active.target.index) ? 1 : 0.2
+      );
+  }
 
-function hideTooltip() {
-  document.getElementById('tooltip').style.display = 'none';
+  function resetHighlight() {
+    svg.selectAll('.ribbons path').attr('fill-opacity', 0.45);
+    arcs.selectAll('path').attr('opacity', 1);
+  }
+
+  // Info panel helpers
+  function showChordInfo(type, data, chordData) {
+    const panel = document.getElementById('chordInfo');
+    if (type === 'group') {
+      const index = data;
+      const catName = allCats[index];
+      const isReg = index < regCategories.length;
+      const typeLabel = isReg ? 'Categoría de Reglamento' : 'Categoría de Tema';
+
+      // Find all connections
+      const connections = [];
+      chordData.forEach(c => {
+        if (c.source.index === index && c.source.value > 0) {
+          connections.push({ name: allCats[c.target.index], value: c.source.value, color: colors[c.target.index] });
+        } else if (c.target.index === index && c.target.value > 0) {
+          connections.push({ name: allCats[c.source.index], value: c.target.value, color: colors[c.source.index] });
+        }
+      });
+      connections.sort((a, b) => b.value - a.value);
+      const totalRels = connections.reduce((s, c) => s + c.value, 0);
+      const maxConn = connections[0]?.value || 1;
+
+      let html = `
+        <div style="color:${colors[index]};" class="ci-type">${typeLabel}</div>
+        <h3>${catName}</h3>
+        <div class="ci-stat"><span>Relaciones totales</span><span class="ci-val">${totalRels}</span></div>
+        <div class="ci-stat"><span>Conexiones</span><span class="ci-val">${connections.length} categorías</span></div>
+        <div class="ci-connections">
+          <h4>Conectada con</h4>
+          ${connections.map(c => `
+            <div class="ci-conn-item">
+              <div>
+                <div>${c.name}</div>
+                <div class="ci-conn-bar" style="width:${(c.value/maxConn)*120}px; background:${c.color};"></div>
+              </div>
+              <span style="font-family:'DM Mono',monospace; font-size:12px; color:var(--accent-light);">${c.value}</span>
+            </div>
+          `).join('')}
+        </div>`;
+      panel.innerHTML = html;
+
+    } else if (type === 'ribbon') {
+      const srcName = allCats[data.source.index];
+      const tgtName = allCats[data.target.index];
+      const val = data.source.value;
+
+      let html = `
+        <div class="ci-type" style="color:${colors[data.source.index]};">Conexión</div>
+        <h3 style="font-size:14px; line-height:1.4;">${srcName} <span style="color:var(--text-dim); font-weight:400;">↔</span> ${tgtName}</h3>
+        <div class="ci-stat" style="margin-top:16px;"><span>Relaciones</span><span class="ci-val">${val}</span></div>
+        <div style="margin-top:20px; padding:16px; background:var(--surface2); border-radius:8px; font-size:12px; color:var(--text-dim); line-height:1.5;">
+          Esta conexión representa ${val} artículos donde reglamentos de <strong style="color:${colors[data.source.index]};">${srcName}</strong> mencionan temas de <strong style="color:${colors[data.target.index]};">${tgtName}</strong>.
+        </div>`;
+      panel.innerHTML = html;
+    }
+  }
+
+  function resetChordInfo() {
+    document.getElementById('chordInfo').innerHTML = `
+      <div class="chord-info-empty">
+        <div class="icon" style="font-size:36px; opacity:0.3; margin-bottom:12px;">◎</div>
+        <div>Pasá el cursor sobre un segmento<br>o cuerda para ver el detalle</div>
+      </div>`;
+  }
 }
 
 // ═══════════════════════════════════════════════
