@@ -687,7 +687,8 @@ function renderDetail() {
       <div class="cat-label" style="margin-bottom: 8px;">${cat} (${rels.length})</div>
       <div class="relation-grid">`;
     rels.forEach(r => {
-      html += `<div class="relation-card" onclick="jumpTo(${r.id})">
+      const targetMode = currentMode === 'regs' ? 'temas' : 'regs';
+      html += `<div class="relation-card" onclick="jumpTo(${r.id}, '${targetMode}')">
         <div class="r-name">${r.name}</div>
         <div class="r-article">📎 ${r.article}</div>
       </div>`;
@@ -698,11 +699,8 @@ function renderDetail() {
   panel.innerHTML = html;
 }
 
-function jumpTo(id) {
-  // Switch mode and select that item
-  const isReg = reglamentos.some(r => r.id === id);
-  if (currentMode === 'regs' && !isReg) switchMode('temas');
-  else if (currentMode === 'temas' && isReg) switchMode('regs');
+function jumpTo(id, targetMode) {
+  if (currentMode !== targetMode) switchMode(targetMode);
   selectItem(id);
 }
 
