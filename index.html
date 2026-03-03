@@ -413,6 +413,66 @@
     color: white;
   }
 
+  /* ── Breadcrumb ── */
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+  .breadcrumb .bc-step {
+    color: var(--accent-light);
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .breadcrumb .bc-step:hover {
+    background: var(--accent-glow);
+    color: var(--text);
+  }
+  .breadcrumb .bc-sep { color: var(--text-dim); font-size: 10px; }
+  .breadcrumb .bc-current {
+    color: var(--text);
+    font-weight: 600;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .breadcrumb .bc-clear {
+    margin-left: auto;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .breadcrumb .bc-clear:hover { color: var(--red); background: rgba(225,112,85,0.1); }
+  .breadcrumb .bc-tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-dim);
+    background: var(--surface2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    margin-left: -4px;
+    margin-right: 2px;
+  }
+
   /* ── Animations ── */
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(8px); }
@@ -570,6 +630,7 @@ for (const reg of reglamentos) {
 let currentView = 'explore';
 let currentMode = 'regs'; // 'regs' or 'temas'
 let selectedId = null;
+let navHistory = []; // { id, mode, name }
 
 function switchView(view) {
   currentView = view;
@@ -584,9 +645,10 @@ function switchView(view) {
   if (view === 'stats') renderStats();
 }
 
-function switchMode(mode) {
+function switchMode(mode, keepHistory) {
   currentMode = mode;
   selectedId = null;
+  if (!keepHistory) navHistory = [];
   document.getElementById('btn-regs').classList.toggle('active', mode === 'regs');
   document.getElementById('btn-temas').classList.toggle('active', mode === 'temas');
   document.getElementById('searchInput').placeholder = mode === 'regs' ? 'Buscar reglamento...' : 'Buscar tema...';
@@ -632,7 +694,8 @@ function renderList() {
   container.innerHTML = html;
 }
 
-function selectItem(id) {
+function selectItem(id, fromJump) {
+  if (!fromJump) navHistory = [];
   selectedId = id;
   renderList();
   renderDetail();
@@ -665,7 +728,25 @@ function renderDetail() {
   relations.forEach(r => { catCounts[r.category] = (catCounts[r.category] || 0) + 1; });
   const topCat = Object.entries(catCounts).sort((a,b) => b[1] - a[1])[0];
 
-  let html = `<div class="detail-header animate-in">
+  let html = '';
+
+  // Breadcrumb
+  if (navHistory.length > 0) {
+    html += `<div class="breadcrumb animate-in">`;
+    navHistory.forEach((step, i) => {
+      const tag = step.mode === 'regs' ? 'REG' : 'TEMA';
+      html += `<span class="bc-tag">${tag}</span>`;
+      html += `<span class="bc-step" title="${step.name}" onclick="navigateTo(${i})">${step.name}</span>`;
+      html += `<span class="bc-sep">→</span>`;
+    });
+    const currentTag = currentMode === 'regs' ? 'REG' : 'TEMA';
+    html += `<span class="bc-tag">${currentTag}</span>`;
+    html += `<span class="bc-current" title="${item.name}">${item.name}</span>`;
+    html += `<span class="bc-clear" onclick="clearNav()">✕ Limpiar</span>`;
+    html += `</div>`;
+  }
+
+  html += `<div class="detail-header animate-in">
     <div class="cat-tag">${item.category}</div>
     <h2>${item.name}</h2>
     <div class="stats">
@@ -700,12 +781,35 @@ function renderDetail() {
 }
 
 function jumpTo(id, targetMode) {
-  if (currentMode !== targetMode) switchMode(targetMode);
-  selectItem(id);
+  // Save current item to history before jumping
+  if (selectedId !== null) {
+    const currentItem = currentMode === 'regs'
+      ? reglamentos.find(r => r.id === selectedId)
+      : temas.find(t => t.id === selectedId);
+    if (currentItem) {
+      const last = navHistory[navHistory.length - 1];
+      if (!last || last.id !== selectedId || last.mode !== currentMode) {
+        navHistory.push({ id: selectedId, mode: currentMode, name: currentItem.name });
+        if (navHistory.length > 4) navHistory = navHistory.slice(-4);
+      }
+    }
+  }
+  if (currentMode !== targetMode) switchMode(targetMode, true);
+  selectItem(id, true);
 }
 
-// ═══════════════════════════════════════════════
-//  HEATMAP
+function navigateTo(index) {
+  const target = navHistory[index];
+  // Trim history to that point
+  navHistory = navHistory.slice(0, index);
+  if (currentMode !== target.mode) switchMode(target.mode, true);
+  selectItem(target.id, true);
+}
+
+function clearNav() {
+  navHistory = [];
+  renderDetail();
+}
 // ═══════════════════════════════════════════════
 
 function renderHeatmap() {
